@@ -25,7 +25,7 @@ I lead backend architecture for **App-Studio** and **Amoga Gateway** — the two
 - **Applied AI, not demos.** LLM integrations (OpenAI, Anthropic), RAG pipelines with real citation grounding, and agentic workflows built to handle retries, partial failure, and cost.
 - **Backend where the hard parts are.** Temporal workflow orchestration, Celery pipelines, PostgreSQL performance work, and large-scale ETL/data migrations.
 - **Multi-tenant by default.** Data isolation, per-tenant configurability, and schema design that survives customer number two hundred.
-- 🎓 B.Tech in Computer Science, IIIT Idupulapaya (9.0 CGPA).
+- 🎓 B.Tech in Computer Science, IIIT Idupulapaya.
 - 💬 Happy to talk about Temporal, RAG evaluation, or why your Celery queue is backing up.
 
 ---
