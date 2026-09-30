@@ -1,0 +1,72 @@
+name: Update repo table
+
+on:
+  schedule:
+    - cron: "30 0 * * *"   # daily, 06:00 IST
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/update-repos.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Regenerate repository table
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_USER: ${{ github.repository_owner }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          from datetime import datetime, timezone
+
+          user = os.environ["GH_USER"]
+          req = urllib.request.Request(
+              f"https://api.github.com/users/{user}/repos?per_page=100&type=owner",
+              headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                       "Accept": "application/vnd.github+json"})
+          repos = json.load(urllib.request.urlopen(req))
+          repos = [r for r in repos
+                   if not r["fork"] and not r["archived"] and r["name"].lower() != user.lower()]
+          repos.sort(key=lambda r: r["pushed_at"], reverse=True)
+
+          def ago(ts):
+              d = (datetime.now(timezone.utc) - datetime.fromisoformat(ts.replace("Z", "+00:00"))).days
+              if d < 1: return "today"
+              if d < 30: return f"{d} day{'s' if d > 1 else ''} ago"
+              m = d // 30
+              if m < 12: return f"{m} month{'s' if m > 1 else ''} ago"
+              y = d // 365
+              return f"{y} year{'s' if y > 1 else ''} ago"
+
+          def cell(s, n=90):
+              s = (s or "").replace("|", "\\|").strip()
+              return s if len(s) <= n else s[: n - 1].rstrip() + "…"
+
+          rows = ["| Repository | Description | Language | ⭐ | Forks | Last updated |",
+                  "| :--- | :--- | :---: | :---: | :---: | :---: |"]
+          for r in repos:
+              rows.append(f"| [{r['name']}]({r['html_url']}) | {cell(r['description'])} | "
+                          f"{r['language'] or '—'} | {r['stargazers_count']} | {r['forks_count']} | "
+                          f"{ago(r['pushed_at'])} |")
+          table = "\n".join(rows)
+
+          readme = open("README.md", encoding="utf-8").read()
+          new = re.sub(r"(<!-- REPOS:START -->).*?(<!-- REPOS:END -->)",
+                       lambda m: f"{m.group(1)}\n{table}\n{m.group(2)}", readme, flags=re.S)
+          open("README.md", "w", encoding="utf-8").write(new)
+          PY
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet README.md; then echo "No changes"; exit 0; fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: refresh repository table"
+          git push
